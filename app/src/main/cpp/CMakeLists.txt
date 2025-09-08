@@ -1,34 +1,63 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.18.0)
 
+project(glfm_examples C)
 
-set(${CMAKE_C_FLAGS}, "${CMAKE_C_FLAGS}")
-add_library(native_app_glue STATIC
-    ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)
+add_library(glfm STATIC src/glfm_android.c)
+target_include_directories(glfm PUBLIC include)
+target_link_libraries(glfm PUBLIC android log GLESv3 EGL)
 
+link_libraries(glfm)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -Wall -Werror")
+# Common
+set(GLFM_APP_ORGANIZATION_IDENTIFIER "com.brackeen")
+set(GLFM_APP_VERSION "1.0")
+set(GLFM_APP_VERSION_ITERATION 1)
+set(GLFM_APP_TARGET_NAME_LIST "")
 
-set(CMAKE_SHARED_LINKER_FLAGS
-    "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
+macro(add_target TARGET SRC_FILES)
+    list(APPEND GLFM_APP_TARGET_NAME_LIST ${TARGET})
+    set(GLFM_APP_TARGET_NAME ${TARGET})
+    set(GLFM_APP_SRC ${SRC_FILES} ${ARGN}) # Use ARGN to allow multiple src files
+    include(GLFMAppTarget)
+endmacro()
 
-include_directories(shadertoy
-        utils
-        shadertoy)
-file(GLOB src-files
-        ${CMAKE_SOURCE_DIR}/shadertoy/*.cpp
-        ${CMAKE_SOURCE_DIR}/utils/*.cpp)
+# Simple examples
+#add_target(glfm_triangle triangle.c)
+#add_target(glfm_touch touch.c)
+#add_target(glfm_heightmap heightmap.c)
+#add_target(glfm_compass compass.c)
+#add_target(glfm_anim anim.c)
 
-add_library(native-activity SHARED main.cpp
-        ${src-files})
+# Examples that require the assets dir
+set(GLFM_APP_ASSETS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+add_target(glfm_typing typing.c)
+#add_target(glfm_shader_toy shader_toy.c)
 
+# Test pattern example
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set_source_files_properties(test_pattern_renderer.metal PROPERTIES LANGUAGE METAL)
+    add_target(glfm_test_pattern test_pattern.c test_pattern_renderer.h test_pattern_renderer_gles2.c
+        test_pattern_renderer_metal.m test_pattern_renderer.metal)
+else()
+    #add_target(glfm_test_pattern test_pattern.c test_pattern_renderer.h test_pattern_renderer_gles2.c)
+endif()
 
-target_include_directories(native-activity PRIVATE
-    ${ANDROID_NDK}/sources/android/native_app_glue)
+# Write index.html for Emscripten examples
+if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    file(COPY icons DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    file(READ index.html.in INDEX_HTML)
 
-target_link_libraries(native-activity
-        android
-        native_app_glue
-        GLESv3
-        EGL
-        GLESv1_CM
-        log)
+    foreach(GLFM_APP_TARGET_NAME ${GLFM_APP_TARGET_NAME_LIST})
+        set(GLFM_APP_HTML "
+    <figure>
+        <a href=\"${GLFM_APP_TARGET_NAME}.html\">
+            <img src=\"icons/${GLFM_APP_TARGET_NAME}.png\">
+            <figcaption>${GLFM_APP_TARGET_NAME}</figcaption>
+        </a>
+    </figure>")
+
+        string(REPLACE "<!-- #figure -->" "${GLFM_APP_HTML}\n<!-- #figure -->" INDEX_HTML "${INDEX_HTML}")
+    endforeach()
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/index.html "${INDEX_HTML}")
+endif()

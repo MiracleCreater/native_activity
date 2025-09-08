@@ -737,7 +737,7 @@ void android_main(struct android_app *state) {
     state->onInputEvent = engine_handle_input;
     engine.app = state;
 
-
+    //ANativeActivity_showSoftInput(state->activity, 0);
     // Prepare to monitor accelerometer
     engine.sensorManager = AcquireASensorManagerInstance(state);
     engine.accelerometerSensor = ASensorManager_getDefaultSensor(
@@ -766,7 +766,7 @@ void android_main(struct android_app *state) {
         // If not animating, we will block forever waiting for events.
         // If animating, we loop until all events are read, then continue
         // to draw the next frame of animation.
-        while ((ident = ALooper_pollAll(engine.animating ? 0 : -1, nullptr, &events,
+        while ((ident = ALooper_pollOnce(engine.animating ? 0 : -1, nullptr, &events,
                                         (void **) &source)) >= 0) {
 
             // Process this event.
